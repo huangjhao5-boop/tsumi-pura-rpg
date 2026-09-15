@@ -220,6 +220,7 @@ class _HangarScreenState extends State<HangarScreen> {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () {
+                  ScaffoldMessenger.of(context).clearSnackBars();
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
                   }

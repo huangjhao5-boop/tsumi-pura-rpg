@@ -656,13 +656,16 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
                   onPressed: () {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CraftLogScreen(
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) =>
+                            CraftLogScreen(
                           craftLogRepository: widget.craftLogRepository,
                           kitRepository: widget.kitRepository,
                           activeKitId: kit.id,
                           activeKitTitle: kit.title,
                         ),
+                        transitionDuration: Duration.zero,
+                        reverseTransitionDuration: Duration.zero,
                       ),
                     );
                   },

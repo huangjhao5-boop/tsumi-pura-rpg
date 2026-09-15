@@ -50,3 +50,9 @@ Integrity mode: development
 ## Follow-up — 2026-09-11T07:49:42Z
 
 The quota reset period has ended. The user requested: GO. Please resume execution of M2 hardening and continue through M3, M4, and M5.
+
+## Follow-up — 2026-09-14T00:42:05Z
+
+System resumed after server restart. The user requested: 匯報最新狀態 (Report latest status) and continued development.
+Current status: M3 tests revealed 7 edge case failures (including Finishing phase auto-reset on active kit switch with high HP).
+Please resume orchestrating your workers, fix these edge cases in M3, achieve 100% test pass on M3, and proceed to Milestone 4.

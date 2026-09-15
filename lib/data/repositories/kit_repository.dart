@@ -100,9 +100,20 @@ class KitRepository implements IKitRepository {
   @override
   Future<void> saveKit(KitItem kit) {
     return _lock.synchronized(() async {
-      final kits = (await getAllKits()).toList();
-      final index = kits.indexWhere((k) => k.id == kit.id);
+      List<KitItem> kits;
+      if (_cachedKits != null) {
+        kits = _cachedKits!.toList();
+      } else {
+        final rawList = await _storage.getJsonList(StorageKeys.kits);
+        kits = <KitItem>[];
+        for (final map in rawList) {
+          try {
+            kits.add(KitItem.fromMap(map));
+          } catch (_) {}
+        }
+      }
 
+      final index = kits.indexWhere((k) => k.id == kit.id);
       if (index >= 0) {
         kits[index] = kit;
       } else {
@@ -111,6 +122,12 @@ class KitRepository implements IKitRepository {
 
       _cachedKits = kits;
       await _persistKits(kits);
+
+      _cachedActiveKitId ??= await _storage.getString(StorageKeys.activeKitId);
+      if (_cachedActiveKitId == null) {
+        _cachedActiveKitId = kit.id;
+        await _storage.setString(StorageKeys.activeKitId, kit.id);
+      }
     });
   }
 

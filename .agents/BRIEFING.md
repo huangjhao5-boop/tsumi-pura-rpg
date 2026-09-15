@@ -1,4 +1,4 @@
-﻿# BRIEFING — 2026-09-11T08:16:40Z
+# BRIEFING — 2026-09-15T09:41:00Z
 
 ## Mission
 Coordinate and oversee the full development of Tsumi-Pura RPG indie game via teamwork_preview_orchestrator, monitor progress, and enforce victory audit before completion.
@@ -16,15 +16,15 @@ Coordinate and oversee the full development of Tsumi-Pura RPG indie game via tea
 - Full multi-agent swarm path (teamwork_preview_orchestrator)
 
 ## User Context
-- **Last user request**: Quota reset period ended. User requested: GO. Resume execution of M2 hardening and continue through M3, M4, and M5.
+- **Last user request**: System in quota cooldown period (resets in ~1h 05m). Milestone 5 Gate Verification in progress.
 - **Pending clarifications**: none
-- **Delivered results**: M1 verified & gated, M2 verified & gated, M3 screens implemented (hangar_screen.dart, showcase_screen.dart, retro_bottom_nav_bar.dart), reported 08:16 UTC progress.
+- **Delivered results**: M1-M4 gated & clean, M5 E2E track 338/338 tests passing, TEST_READY.md published, M5 challenge suites authored.
 
 ## Project Status
-- **Phase**: in progress
-- **Active Orchestrator**: 6fa20b7c-dc2d-40cc-9d90-84e64adeddcf
-- **Crons**: task-279 (Progress Reporting, */8), task-281 (Liveness Check, */10)
-- **Current Milestone**: M3 (Model Hangar & Showcase Gallery) — Worker active implementing main.dart integration & tests.
+- **Phase**: in progress (quota cooldown)
+- **Active Orchestrator**: 6fa20b7c-dc2d-40cc-9d90-84e64adeddcf (paused awaiting quota reset)
+- **Crons**: task-1601 (Progress Reporting, */8), task-1602 (Liveness Check, */10)
+- **Current Milestone**: Milestone 5: 100% E2E Pass & Tier 5 Adversarial Coverage Hardening (Gate Verification).
 
 ## Victory Audit Status
 - **Triggered**: no
@@ -35,6 +35,6 @@ Coordinate and oversee the full development of Tsumi-Pura RPG indie game via tea
 - c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\.agents\ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\.agents\BRIEFING.md — Sentinel persistent memory
 - c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\PROJECT.md — Architecture & Feature Inventory
-- c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\lib\presentation\screens\hangar_screen.dart — Hangar CRUD Screen
-- c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\lib\presentation\screens\showcase_screen.dart — Completed Kit Showcase Screen
-- c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\lib\presentation\widgets\retro_bottom_nav_bar.dart — Navigation Bar
+- c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\TEST_INFRA.md — Test Infrastructure Architecture
+- c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\test\e2e\e2e_tier1_r1_r2_test.dart — E2E Tier 1 Suite
+- c:\Users\k-kaw\Documents\antigravity\nifty-heisenberg\test\e2e\e2e_tier2_r1_r2_test.dart — E2E Tier 2 Suite

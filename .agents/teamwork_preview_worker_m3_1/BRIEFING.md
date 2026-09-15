@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-11T08:12:40Z
+# BRIEFING — 2026-09-11T08:24:30Z
 
 ## Mission
 Implement Milestone 3 (Model Hangar & Showcase Gallery, Features 18–25) with full retro 8-bit styling, robust CRUD, dual navigation, victory transition, and comprehensive widget tests while preserving 100% pass on all existing tests.
@@ -19,7 +19,7 @@ Implement Milestone 3 (Model Hangar & Showcase Gallery, Features 18–25) with f
 
 ## Current Parent
 - Conversation ID: 6fa20b7c-dc2d-40cc-9d90-84e64adeddcf
-- Updated: 2026-09-11T08:12:40Z
+- Updated: 2026-09-11T08:24:30Z
 
 ## Task Summary
 - **What to build**:
@@ -31,33 +31,41 @@ Implement Milestone 3 (Model Hangar & Showcase Gallery, Features 18–25) with f
      - `test/widget/hangar_screen_test.dart`
      - `test/widget/showcase_screen_test.dart`
      - `test/widget/navigation_and_active_kit_test.dart`
-     - Verify existing 137 tests pass.
+     - Verified all 152 tests pass (137 existing + 15 new).
 - **Success criteria**:
   - `flutter analyze` has 0 errors and 0 warnings.
-  - `flutter test` passes 100%.
+  - `flutter test` passes 100% (152/152 passed).
 - **Interface contracts**: PROJECT.md & SPEC.md
 - **Code layout**: PROJECT.md § Code Layout
 
 ## Key Decisions Made
-- Use Explorer blueprints 1, 2, and 3 for complete UI design, avoiding any guesswork.
-- Maintain `btn_craft_log` in header HUD to prevent breaking `test/widget_test.dart` and M2 tests.
-- Maintain '收錄至展示櫃 (Showcase)' in Quest Clear modal to prevent breaking `test/challenge/ui_state_autosave_stress_test.dart` while adding '前往展示櫃觀看' and '返回機庫挑選新目標' buttons for Milestone 3.
+- Followed Explorer 1, 2, and 3 blueprints precisely for layout, colors, and contracts.
+- Maintained `btn_craft_log` in header HUD and added `btn_hangar` & `btn_showcase` to support both M2 and M3 requirements.
+- Maintained `btn_clear_restart` ('收錄至展示櫃 (Showcase)') in Quest Clear modal alongside new M3 navigation buttons (`btn_clear_to_showcase` and `btn_clear_to_hangar`), preserving 100% compatibility with M2 tests while fully fulfilling M3 requirements.
+- Guarded target change dialogue so that it triggers when returning from screen navigation rather than during initial app launch, avoiding regression in M2 single-kit test assertions.
 
 ## Change Tracker
-- **Files modified**: None yet
-- **Build status**: Baseline test passed (137/137)
+- **Files modified**:
+  - `lib/presentation/screens/hangar_screen.dart`: Created HangarScreen & CRUD dialogs
+  - `lib/presentation/screens/showcase_screen.dart`: Created ShowcaseScreen & Detail Dialog
+  - `lib/presentation/widgets/retro_bottom_nav_bar.dart`: Created RetroBottomNavBar
+  - `lib/main.dart`: Integrated dual navigation, active kit link, and victory modal
+  - `test/widget/hangar_screen_test.dart`: 7 tests covering Hangar features
+  - `test/widget/showcase_screen_test.dart`: 5 tests covering Showcase features
+  - `test/widget/navigation_and_active_kit_test.dart`: 3 tests covering navigation & active kit link
+- **Build status**: PASS (152/152 tests pass)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: 137 passed
-- **Lint status**: Clean
-- **Tests added/modified**: 0 added yet
+- **Build/test result**: 152 passed (100% pass)
+- **Lint status**: 0 issues found (Clean)
+- **Tests added/modified**: 15 new widget tests added
 
 ## Artifact Index
-- `lib/presentation/screens/hangar_screen.dart` — [TBD]
-- `lib/presentation/screens/showcase_screen.dart` — [TBD]
-- `lib/presentation/widgets/retro_bottom_nav_bar.dart` — [TBD]
-- `lib/main.dart` — [TBD]
-- `test/widget/hangar_screen_test.dart` — [TBD]
-- `test/widget/showcase_screen_test.dart` — [TBD]
-- `test/widget/navigation_and_active_kit_test.dart` — [TBD]
+- `lib/presentation/screens/hangar_screen.dart` — Model Hangar Screen & CRUD Dialogs
+- `lib/presentation/screens/showcase_screen.dart` — Showcase Gallery Screen & Detail Dialog
+- `lib/presentation/widgets/retro_bottom_nav_bar.dart` — Retro Bottom Arcade Navigation Dock
+- `lib/main.dart` — Dual Navigation, Active Kit Link, Quest Clear Flow
+- `test/widget/hangar_screen_test.dart` — Automated widget tests for Hangar
+- `test/widget/showcase_screen_test.dart` — Automated widget tests for Showcase
+- `test/widget/navigation_and_active_kit_test.dart` — Automated tests for Navigation & Victory Link

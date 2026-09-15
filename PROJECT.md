@@ -63,8 +63,8 @@ lib/
 | E2E | E2E Testing Track | Independent requirement-driven test suite (Tiers 1-4), publishes TEST_READY.md | none | PLANNED |
 | M1 | Pomodoro & Battle Engine | Features 1-12: Core battle engine, timers (25m/5m, 50m/10m, 5s debug), 5 multipliers, execution lock, Mercy Rule 50%, lint fix | none | DONE |
 | M2 | Local Persistence & CraftLog | Features 13-17: KitItem & CraftLog models, storage service, offline repository, auto-hydration, CraftLog stats view | M1 | DONE |
-| M3 | Model Hangar & Showcase | Features 18-25: Hangar CRUD, Grade presets & custom HP, active kit switching, victory transition, Showcase Gallery | M2 | IN_PROGRESS |
-| M4 | 8-Bit Retro Game Juice | Features 26-31: Pixel UI styling, typography, screen shake, floating damage text, hurt flash, zero-cost retro audio | M1, M3 | PLANNED |
+| M3 | Model Hangar & Showcase | Features 18-25: Hangar CRUD, Grade presets & custom HP, active kit switching, victory transition, Showcase Gallery | M2 | DONE |
+| M4 | 8-Bit Retro Game Juice | Features 26-31: Pixel UI styling, typography, screen shake, floating damage text, hurt flash, zero-cost retro audio | M1, M3 | IN_PROGRESS |
 | M5 | Final Milestone & Coverage | Features 32-33: 100% E2E test pass, Tier 5 Adversarial Coverage Hardening, `flutter analyze` 0 errors | M1, M2, M3, M4, E2E | PLANNED |
 | M6 | Forensic Victory Audit | Mandatory forensic audit for integrity, zero-cost, and genuine logic before reporting to Sentinel | M5 | PLANNED |
 

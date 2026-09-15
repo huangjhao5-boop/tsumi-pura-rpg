@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'core/audio/retro_audio_service.dart';
 import 'core/constants/game_constants.dart';
 import 'data/repositories/craft_log_repository.dart';
 import 'data/repositories/kit_repository.dart';
@@ -11,7 +12,15 @@ import 'domain/models/kit_item.dart';
 import 'presentation/screens/craft_log_screen.dart';
 import 'presentation/screens/hangar_screen.dart';
 import 'presentation/screens/showcase_screen.dart';
+import 'presentation/theme/retro_colors.dart';
+import 'presentation/theme/retro_typography.dart';
+import 'presentation/widgets/boss_hurt_flash.dart';
+import 'presentation/widgets/floating_damage_text.dart';
+import 'presentation/widgets/pixel_button.dart';
+import 'presentation/widgets/pixel_frame.dart';
+import 'presentation/widgets/pixel_hp_bar.dart';
 import 'presentation/widgets/retro_bottom_nav_bar.dart';
+import 'presentation/widgets/screen_shake.dart';
 
 void main() {
   runApp(const TsumiPuraApp());
@@ -34,11 +43,9 @@ class TsumiPuraApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(
-          0xFF10121A,
-        ), // Dark workbench arcade tone
-        fontFamily: 'Press Start 2P',
-        fontFamilyFallback: const ['VT323', 'Courier New', 'monospace'],
+        scaffoldBackgroundColor: RetroColors.darkSlate,
+        fontFamily: RetroTypography.primaryFont,
+        fontFamilyFallback: RetroTypography.monospaceFallback,
         useMaterial3: true,
       ),
       home: BattleAtelierScreen(
@@ -95,9 +102,15 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
   // --- Battle Log & Dialogue ---
   String _battleDialogText = '工作桌前一切就緒。請選擇工序技能，開始專注討伐！';
 
-  // --- Animation Controllers ---
+  // --- Animation & Combat Juice Controllers ---
   late AnimationController _idleController;
   late AnimationController _shakeController;
+  final ScreenShakeController _screenShakeController = ScreenShakeController();
+  final BossHurtFlashController _bossHurtFlashController =
+      BossHurtFlashController();
+  final FloatingDamageController _floatingDamageController =
+      FloatingDamageController();
+  final IRetroAudioService _audioService = RetroAudioService.instance;
   bool _isHurt = false;
   String? _floatingDamageText;
   Color _floatingDamageColor = Colors.yellow;
@@ -130,7 +143,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
     _hydrateActiveKit();
   }
 
-  Future<void> _hydrateActiveKit() async {
+  Future<void> _hydrateActiveKit({bool notifyTargetChange = false}) async {
     try {
       final storedKit = await _kitRepo.getActiveKit();
       if (storedKit != null && mounted) {
@@ -140,19 +153,18 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
           currentHp = storedKit.currentHp;
           maxHp = storedKit.totalHp;
 
-          if (isTargetChanged) {
-            _battleDialogText =
-                '🎯 已鎖定新討伐目標：【${storedKit.grade} ${storedKit.title}】！請選擇工序開工。';
+          if (isTargetChanged && notifyTargetChange) {
+            _battleDialogText = '🎯 已鎖定新討伐目標！請選擇工序開工。';
             _floatingDamageText = null;
+          }
 
-            // Reset Finishing phase if new kit HP > 20%
-            if (_selectedPhase == CraftPhases.finishing &&
-                !_battleEngine.canExecuteFinishing(
-                  currentHp: currentHp,
-                  maxHp: maxHp,
-                )) {
-              _selectedPhase = CraftPhases.snapFit;
-            }
+          // Reset Finishing phase if new kit HP > 20%
+          if (_selectedPhase == CraftPhases.finishing &&
+              !_battleEngine.canExecuteFinishing(
+                currentHp: currentHp,
+                maxHp: maxHp,
+              )) {
+            _selectedPhase = CraftPhases.snapFit;
           }
         });
       }
@@ -200,6 +212,9 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
         setState(() {
           _remainingSeconds--;
         });
+        if (_remainingSeconds <= 5 && _remainingSeconds > 0) {
+          _audioService.playTimerTick();
+        }
       } else {
         _completeWorkSession();
       }
@@ -213,7 +228,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
       _totalSeconds = _selectedMode.restSeconds;
       _remainingSeconds = _totalSeconds;
       _battleDialogText =
-          '☕ 開工階段完成！進入休息整備時間（${_selectedMode.restSeconds}秒），喝口水放鬆一下！';
+          '$_battleDialogText\n☕ 進入休息整備時間（${_selectedMode.restSeconds}秒），喝口水放鬆一下！';
     });
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -366,6 +381,36 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
   }
 
   void _triggerHitJuice(int damage, bool isInterrupted) {
+    // 1. Feature 28: 2D Screen Shake
+    final double intensity = DamageColorPalette.getShakeIntensity(
+      _selectedPhase,
+      isInterrupted: isInterrupted,
+      damage: damage,
+    );
+    _screenShakeController.shake(intensity: intensity);
+
+    // 2. Feature 30: Boss Hurt Flash
+    _bossHurtFlashController.flash();
+
+    // 3. Feature 29: Floating Damage Numbers
+    _floatingDamageController.spawn(
+      damage: damage,
+      phase: _selectedPhase,
+      isInterrupted: isInterrupted,
+    );
+
+    // 4. Feature 31: Zero-Cost Retro Audio Trigger
+    if ((currentHp - damage) <= 0) {
+      _audioService.playFinishingKill();
+    } else if (damage >= 150 ||
+        _selectedPhase == CraftPhases.airbrush ||
+        _selectedPhase == CraftPhases.detailing) {
+      _audioService.playCriticalStrike();
+    } else {
+      _audioService.playAttackHit();
+    }
+
+    // Baseline fallback state
     setState(() {
       _isHurt = true;
       _floatingDamageText = isInterrupted
@@ -404,6 +449,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
   }
 
   void _showQuestClearDialog() {
+    _audioService.playVictoryFanfare();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -684,9 +730,11 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
       color: const Color(0xFF212234),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
           Row(
             children: [
               const Text(
@@ -735,6 +783,54 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
           ),
           Row(
             children: [
+              // Mute Toggle Quick Action
+              InkWell(
+                key: const Key('btn_mute_toggle'),
+                onTap: () {
+                  setState(() {
+                    _audioService.toggleMute();
+                  });
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10121A),
+                    border: Border.all(
+                      color: _audioService.isMuted
+                          ? Colors.white38
+                          : const Color(0xFFBD93F9),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _audioService.isMuted
+                            ? Icons.volume_off
+                            : Icons.volume_up,
+                        color: _audioService.isMuted
+                            ? Colors.white38
+                            : const Color(0xFFBD93F9),
+                        size: 10,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        _audioService.isMuted ? 'MUTE' : 'SFX',
+                        style: TextStyle(
+                          color: _audioService.isMuted
+                              ? Colors.white38
+                              : const Color(0xFFBD93F9),
+                          fontSize: 7,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const Icon(Icons.circle, color: Color(0xFFFFD54F), size: 10),
               const SizedBox(width: 4),
               Text(
@@ -745,7 +841,8 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildHeaderNavBadge({
@@ -777,34 +874,42 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
     );
   }
 
+  Route<T> _createRetroRoute<T>(Widget page) {
+    return PageRouteBuilder<T>(
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    );
+  }
+
   Future<void> _openHangarScreen() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => HangarScreen(
+      _createRetroRoute(
+        HangarScreen(
           kitRepository: _kitRepo,
           craftLogRepository: _craftLogRepo,
         ),
       ),
     );
-    await _hydrateActiveKit();
+    await _hydrateActiveKit(notifyTargetChange: true);
   }
 
   Future<void> _openShowcaseScreen() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => ShowcaseScreen(
+      _createRetroRoute(
+        ShowcaseScreen(
           kitRepository: _kitRepo,
           craftLogRepository: _craftLogRepo,
         ),
       ),
     );
-    await _hydrateActiveKit();
+    await _hydrateActiveKit(notifyTargetChange: true);
   }
 
   Future<void> _openCraftLogScreen() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => CraftLogScreen(
+      _createRetroRoute(
+        CraftLogScreen(
           craftLogRepository: _craftLogRepo,
           kitRepository: _kitRepo,
           activeKitId: _activeKit.id,
@@ -812,7 +917,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
         ),
       ),
     );
-    await _hydrateActiveKit();
+    await _hydrateActiveKit(notifyTargetChange: true);
   }
 
   void _onNavTabSelected(RetroNavTab tab) {
@@ -832,32 +937,28 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
   }
 
   Widget _buildBossCard(double hpPercentage) {
-    Color hpColor = hpPercentage > 0.5
-        ? const Color(0xFF4CAF50)
-        : (hpPercentage > 0.2
-              ? const Color(0xFFFFB300)
-              : const Color(0xFFFF3D00));
-
-    return Container(
+    return PixelFrame(
+      borderColor: const Color(0xFF44475A),
+      backgroundColor: const Color(0xFF1D1E2C),
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1D1E2C),
-        border: Border.all(color: const Color(0xFF44475A), width: 2),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Lv.15 $bossName',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  'Lv.15 $bossName',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '規格: ${bossGrade.contains('1/144') ? bossGrade : '$bossGrade 1/144'}',
                 style: const TextStyle(color: Color(0xFF8BE9FD), fontSize: 9),
@@ -867,56 +968,13 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
           const SizedBox(height: 8),
 
           // Pixel HP Bar
-          Row(
-            children: [
-              const Text(
-                'HP ',
-                style: TextStyle(
-                  color: Color(0xFFFF5252),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  height: 16,
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    border: Border.all(color: Colors.white70, width: 2),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: hpPercentage.clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: hpColor,
-                        gradient: LinearGradient(
-                          colors: [hpColor, hpColor.withValues(alpha: 0.75)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${(hpPercentage * 100).toStringAsFixed(0)}%',
-                style: TextStyle(
-                  color: hpColor,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$currentHp / $maxHp HP',
-            textAlign: TextAlign.right,
-            style: const TextStyle(color: Colors.white38, fontSize: 8),
+          PixelHpBar(
+            currentHp: currentHp,
+            maxHp: maxHp,
+            height: 16,
+            showLabel: true,
+            showPercentage: true,
+            showFraction: true,
           ),
         ],
       ),
@@ -924,152 +982,161 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
   }
 
   Widget _buildBattleStage() {
-    return AnimatedBuilder(
-      animation: _shakeController,
-      builder: (context, child) {
-        double shakeOffset =
-            sin(_shakeController.value * pi * 8) *
-            8 *
-            (1 - _shakeController.value);
-        return Transform.translate(
-          offset: Offset(shakeOffset, 0),
-          child: child,
-        );
-      },
-      child: Container(
-        height: 210,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D0E15),
-          border: Border.all(
-            color: _isHurt ? const Color(0xFFFF5252) : const Color(0xFF44475A),
-            width: 2,
+    return ScreenShake(
+      controller: _screenShakeController,
+      child: AnimatedBuilder(
+        animation: _shakeController,
+        builder: (context, child) {
+          double shakeOffset =
+              sin(_shakeController.value * pi * 8) *
+              8 *
+              (1 - _shakeController.value);
+          return Transform.translate(
+            offset: Offset(shakeOffset, 0),
+            child: child,
+          );
+        },
+        child: Container(
+          height: 210,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D0E15),
+            border: Border.all(
+              color: _isHurt ? const Color(0xFFFF5252) : const Color(0xFF44475A),
+              width: 2,
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            // Background Isometric Scanline Grid
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.12,
-                child: GridPaper(
-                  color: Colors.cyanAccent,
-                  divisions: 2,
-                  subdivisions: 1,
+          child: FloatingDamageOverlay(
+            controller: _floatingDamageController,
+            child: Stack(
+              children: [
+                // Background Isometric Scanline Grid
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0.12,
+                    child: GridPaper(
+                      color: Colors.cyanAccent,
+                      divisions: 2,
+                      subdivisions: 1,
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            // Boss Sprite (Top Right)
-            Positioned(
-              top: 10,
-              right: 12,
-              child: AnimatedBuilder(
-                animation: _idleController,
-                builder: (context, child) {
-                  double scale = _isRunning
-                      ? (1.0 + _idleController.value * 0.04)
-                      : 1.0;
-                  return Transform.scale(scale: scale, child: child);
-                },
-                child: ColorFiltered(
-                  colorFilter: _isHurt
-                      ? const ColorFilter.mode(
-                          Color(0x99FF0000),
-                          BlendMode.srcATop,
-                        )
-                      : (currentHp <= 0
+                // Boss Sprite (Top Right)
+                Positioned(
+                  top: 10,
+                  right: 12,
+                  child: BossHurtFlash(
+                    controller: _bossHurtFlashController,
+                    child: AnimatedBuilder(
+                      animation: _idleController,
+                      builder: (context, child) {
+                        double scale = _isRunning
+                            ? (1.0 + _idleController.value * 0.04)
+                            : 1.0;
+                        return Transform.scale(scale: scale, child: child);
+                      },
+                      child: ColorFiltered(
+                        colorFilter: _isHurt
                             ? const ColorFilter.mode(
-                                Colors.grey,
-                                BlendMode.saturation,
+                                Color(0x99FF0000),
+                                BlendMode.srcATop,
                               )
-                            : const ColorFilter.mode(
-                                Colors.transparent,
-                                BlendMode.dst,
-                              )),
-                  child: Image.asset(
-                    'assets/images/boss_green_box.jpg',
-                    height: 125,
-                    width: 125,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.smart_toy,
-                      size: 100,
-                      color: Colors.greenAccent,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Hero Sprite (Bottom Left)
-            Positioned(
-              bottom: 12,
-              left: 12,
-              child: AnimatedBuilder(
-                animation: _idleController,
-                builder: (context, child) {
-                  double offset = _isRunning
-                      ? sin(_idleController.value * pi) * 6
-                      : 0;
-                  return Transform.translate(
-                    offset: Offset(offset, -offset),
-                    child: child,
-                  );
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: const Color(0xFF8BE9FD),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8BE9FD).withValues(alpha: 0.3),
-                        blurRadius: 6,
+                            : (currentHp <= 0
+                                  ? const ColorFilter.mode(
+                                      Colors.grey,
+                                      BlendMode.saturation,
+                                    )
+                                  : const ColorFilter.mode(
+                                      Colors.transparent,
+                                      BlendMode.dst,
+                                    )),
+                        child: Image.asset(
+                          'assets/images/boss_green_box.jpg',
+                          height: 125,
+                          width: 125,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.smart_toy,
+                            size: 100,
+                            color: Colors.greenAccent,
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
-                  child: Image.asset(
-                    'assets/images/hero.jpg',
-                    height: 95,
-                    width: 95,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.person,
-                      size: 80,
-                      color: Colors.blueAccent,
                     ),
                   ),
                 ),
-              ),
-            ),
 
-            // Floating Damage Numbers
-            if (_floatingDamageText != null)
-              Positioned(
-                top: 30,
-                right: 70,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.85),
-                    border: Border.all(color: _floatingDamageColor, width: 2),
-                  ),
-                  child: Text(
-                    _floatingDamageText!,
-                    style: TextStyle(
-                      color: _floatingDamageColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                // Hero Sprite (Bottom Left)
+                Positioned(
+                  bottom: 12,
+                  left: 12,
+                  child: AnimatedBuilder(
+                    animation: _idleController,
+                    builder: (context, child) {
+                      double offset = _isRunning
+                          ? sin(_idleController.value * pi) * 6
+                          : 0;
+                      return Transform.translate(
+                        offset: Offset(offset, -offset),
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: const Color(0xFF8BE9FD),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF8BE9FD).withValues(alpha: 0.3),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: Image.asset(
+                        'assets/images/hero.jpg',
+                        height: 95,
+                        width: 95,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.person,
+                          size: 80,
+                          color: Colors.blueAccent,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+
+                // Floating Damage Numbers
+                if (_floatingDamageText != null)
+                  Positioned(
+                    top: 30,
+                    right: 70,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.85),
+                        border: Border.all(color: _floatingDamageColor, width: 2),
+                      ),
+                      child: Text(
+                        _floatingDamageText!,
+                        style: TextStyle(
+                          color: _floatingDamageColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1127,6 +1194,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
         SizedBox(
           width: double.infinity,
           child: SegmentedButton<String>(
+            showSelectedIcon: false,
             style: ButtonStyle(
               visualDensity: VisualDensity.compact,
               shape: WidgetStateProperty.all(
@@ -1196,6 +1264,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
             onSelectionChanged: _pomodoroPhase != PomodoroPhase.idle
                 ? null
                 : (Set<String> newSelection) {
+                    _audioService.playButtonClick();
                     String chosen = newSelection.first;
                     if (chosen == 'Finishing' && !isExecuteReady) {
                       _showSnackAlert('⚠️ 水貼處決技限定 Boss 殘血 20% 以下！');
@@ -1203,8 +1272,12 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
                     }
                     setState(() {
                       _selectedPhase = chosen;
+                      final skillName =
+                          (chosen == CraftPhases.finishing || chosen == 'Finishing')
+                              ? '${_phaseSkillNames[chosen]} (水貼・仕上げ)'
+                              : _phaseSkillNames[chosen];
                       _battleDialogText =
-                          '已切換武器：【${_phaseSkillNames[chosen]}】(${_phaseMultipliers[chosen]}x 倍率)。';
+                          '已切換武器：【$skillName】(${_phaseMultipliers[chosen]}x 倍率)。';
                     });
                   },
           ),
@@ -1277,6 +1350,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
       child: SizedBox(
         width: double.infinity,
         child: SegmentedButton<PomodoroMode>(
+          showSelectedIcon: false,
           style: ButtonStyle(
             visualDensity: VisualDensity.compact,
             shape: WidgetStateProperty.all(
@@ -1313,6 +1387,7 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
           onSelectionChanged: _pomodoroPhase != PomodoroPhase.idle
               ? null
               : (newSelection) {
+                  _audioService.playButtonClick();
                   setState(() {
                     _selectedMode = newSelection.first;
                   });
@@ -1431,16 +1506,10 @@ class _BattleAtelierScreenState extends State<BattleAtelierScreen>
             const SizedBox(width: 8),
             Expanded(
               flex: 1,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6272A4),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
-                  ),
-                  side: const BorderSide(color: Colors.white38, width: 1),
-                ),
+              child: PixelButton(
+                color: const Color(0xFF6272A4),
+                borderColor: Colors.white38,
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 onPressed: () => _startTimer(PomodoroMode.debug),
                 child: const Text('5秒測試', style: TextStyle(fontSize: 9)),
               ),
